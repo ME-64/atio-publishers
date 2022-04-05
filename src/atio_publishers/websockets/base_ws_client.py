@@ -12,6 +12,56 @@ import signal
 log: logging.Logger = logging.getLogger('atio')
 
 
+class Publisher:
+
+    def __init__(self, redis_url: str, redis_channel: str, pub_queue: aiop.Queue):# {{{
+        self._started: asyncio.Event = asyncio.Event()
+        self.redis_url: str = redis_url
+        self.redis_channel: str = redis_channel
+        self.pub_queue: aiop.Queue = pub_queue# }}}
+
+    async def _start(self) -> None:# {{{
+        self.redis: redis.asycnio.client.Redis = aioredis.from_url(self.redis_url, decode_responses=True)
+        await self.redis.ping()
+        self._started.set()
+        while True:
+            try:
+                to_pub: dict = await self.pub_queue.coro_get()
+                await self.redis.publish(self.redis_channel, ujson.dumps(to_pub))
+            except:
+                os.kill(os.getpid(), signal.SIGINT)# }}}
+
+    async def _run(self) -> None:# {{{
+        loop: asyncio.unix_events._UnixSelectorEventLoop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.create_task(self._start())# }}}
+
+    def start(self) -> None:# {{{
+        self.proc: mp.Process = mp.Process(target=self._run)
+        self.proc.start()# }}}
+
+class Worker(ABC):
+
+    def __init__(self, work_queue: aiop.Queue, pub_queue: aiop.Queue):# {{{
+        self.work_queue: aiop.Queue = work_queue
+        self.pub_queue: aiop.Queue = pub_queue# }}}
+
+    @abstractmethod
+    def do_work(self) -> dict:# {{{
+        pass# }}}
+
+    def _run(self) -> None:# {{{
+        while True:
+            try:
+                work  = self.work_queue.get()
+                result: dict = self.do_work(work)
+                self.pub_queue.put(result)
+            except:
+                os.kill(os.getpid(), signal.SIGINT)# }}}
+
+    def start(self) -> None:# {{{
+        self.proc: mp.Process = mp.Process(target=self._run)
+        self.proc.start()# }}}
 
 class BaseWSClient(ABC):
 
@@ -59,56 +109,3 @@ class BaseWSClient(ABC):
         # when the websocket connection is closed, we disconnect
         # and let the container handle reconnecting
         os.kill(os.getpid(), signal.SIGINT)# }}}
-
-
-class Publisher:
-
-    def __init__(self, redis_url: str, redis_channel: str, pub_queue: aiop.Queue):# {{{
-        self._started: asyncio.Event = asyncio.Event()
-        self.redis_url: str = redis_url
-        self.redis_channel: str = redis_channel
-        self.pub_queue: aiop.Queue = pub_queue# }}}
-
-    async def _start(self) -> None:# {{{
-        self.redis: redis.asycnio.client.Redis = aioredis.from_url(self.redis_url, decode_responses=True)
-        await self.redis.ping()
-        self._started.set()
-        while True:
-            try:
-                to_pub: dict = await self.pub_queue.coro_get()
-                await self.redis.publish(self.redis_channel, ujson.dumps(to_pub))
-            except:
-                os.kill(os.getpid(), signal.SIGINT)# }}}
-
-    async def _run(self) -> None:# {{{
-        loop: asyncio.unix_events._UnixSelectorEventLoop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        loop.create_task(self._start())# }}}
-
-    def start(self) -> None:# {{{
-        self.proc: mp.Process = mp.Process(target=self._run)
-        self.proc.start()# }}}
-
-
-class Worker(ABC):
-
-    def __init__(self, work_queue: aiop.Queue, pub_queue: aiop.Queue):# {{{
-        self.work_queue: aiop.Queue = work_queue
-        self.pub_queue: aiop.Queue = pub_queue# }}}
-
-    @abstractmethod
-    def do_work(self) -> dict:# {{{
-        pass# }}}
-
-    def _run(self) -> None:# {{{
-        while True:
-            try:
-                work  = self.work_queue.get()
-                result: dict = self.do_work(work)
-                self.pub_queue.put(result)
-            except:
-                os.kill(os.getpid(), signal.SIGINT)# }}}
-
-    def start(self) -> None:# {{{
-        self.proc: mp.Process = mp.Process(target=self._run)
-        self.proc.start()# }}}
