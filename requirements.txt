@@ -1,0 +1,8 @@
+aiohttp>3.8,<4
+pandas>=1.4,<2
+sortedcontainers>=2.4,<3
+ujson>=4.3,<5
+aioprocessing>=2,<3
+redis>4.2,<5
+
+
