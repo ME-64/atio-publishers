@@ -78,11 +78,7 @@ class BaseWSClient(ABC):
         self.worker: Worker = worker(self.work_queue, self.pub_queue)# }}}
 
     @abstractmethod
-    async def subscribe(self):# {{{
-        pass# }}}
-
-    @abstractmethod
-    async def unsubscribe(self):# {{{
+    async def subscribe(self, *args, **kwargs):# {{{
         pass# }}}
 
     @abstractmethod
