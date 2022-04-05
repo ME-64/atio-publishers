@@ -6,6 +6,7 @@ import asyncio
 import aiohttp
 from redis import asyncio as aioredis
 import aioprocessing as aiop
+import multiprocessing as mp
 import os
 import signal
 
@@ -21,7 +22,7 @@ class Publisher:
         self.pub_queue: aiop.Queue = pub_queue# }}}
 
     async def _start(self) -> None:# {{{
-        self.redis: redis.asycnio.client.Redis = aioredis.from_url(self.redis_url, decode_responses=True)
+        self.redis: aioredis.client.Redis = aioredis.from_url(self.redis_url, decode_responses=True)
         await self.redis.ping()
         self._started.set()
         while True:
@@ -32,7 +33,7 @@ class Publisher:
                 os.kill(os.getpid(), signal.SIGINT)# }}}
 
     async def _run(self) -> None:# {{{
-        loop: asyncio.unix_events._UnixSelectorEventLoop = asyncio.new_event_loop()
+        loop: asyncio.AbstractEventLoop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         loop.create_task(self._start())# }}}
 
@@ -47,7 +48,7 @@ class Worker(ABC):
         self.pub_queue: aiop.Queue = pub_queue# }}}
 
     @abstractmethod
-    def do_work(self) -> dict:# {{{
+    def do_work(self, work: dict) -> dict:# {{{
         pass# }}}
 
     def _run(self) -> None:# {{{
@@ -69,7 +70,7 @@ class BaseWSClient(ABC):
             worker: Worker, publisher: Publisher):
         self.ws_url: str = ws_url
         self._started: asyncio.Event = asyncio.Event()
-        self.pub_queue: aiop.Queue = aip.Queue()
+        self.pub_queue: aiop.Queue = aiop.Queue()
         self.work_queue: aiop.Queue = aiop.Queue()
         self.publisher: Publisher = publisher(redis_url=redis_url,
                 redis_channel=redis_channel,
@@ -89,7 +90,7 @@ class BaseWSClient(ABC):
         pass# }}}
 
     @abstractmethod
-    async def on_message(self, msg: str) -> None:# {{{
+    async def on_message(self, msg: aiohttp.WSMessage) -> None:# {{{
         pass# }}}
 
     async def start(self) -> None:# {{{
