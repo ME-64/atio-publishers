@@ -32,7 +32,7 @@ class Publisher:
             except:
                 os.kill(os.getpid(), signal.SIGINT)# }}}
 
-    async def _run(self) -> None:# {{{
+    def _run(self) -> None:# {{{
         loop: asyncio.AbstractEventLoop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         loop.create_task(self._start())# }}}
