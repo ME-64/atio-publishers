@@ -59,9 +59,9 @@ class Publisher:
 
 class Worker(ABC):
 
-    def __init__(self, work_queue: aiop.queue.Queue, pub_queue: aiop.queue.Queue):# {{{
-        self.work_queue: aiop.queue.Queue = work_queue
-        self.pub_queue: aiop.queue.Queue = pub_queue
+    def __init__(self, work_queue: AioQ, pub_queue: AioQ):# {{{
+        self.work_queue: AioQ = work_queue
+        self.pub_queue: AioQ = pub_queue
         self._started: asyncio.Event = asyncio.Event()
         log.debug('worker init complete')
         # }}}
@@ -98,8 +98,8 @@ class BaseWSClient(ABC):
             worker: Worker, publisher: Publisher):
         self.ws_url: str = ws_url
         self._started: asyncio.Event = asyncio.Event()
-        self.pub_queue: aiop.queue.Queue = aiop.AioQueue()
-        self.work_queue: aiop.queue.Queue = aiop.AioQueue()
+        self.pub_queue: AioQ = aiop.AioQueue()
+        self.work_queue: AioQ = aiop.AioQueue()
         self.publisher: Publisher = publisher(redis_url=redis_url,
                 redis_channel=redis_channel,
                 pub_queue=self.pub_queue)
