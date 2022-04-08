@@ -36,6 +36,7 @@ class Publisher:
                 await self.redis.publish(self.redis_channel, ujson.dumps(to_pub))
             except Exception as e:
                 log.debug(f'error received in publisher thread {e}')
+                raise e
                 os.kill(os.getpid(), signal.SIGINT)# }}}
 
     def _run(self) -> None:# {{{
@@ -73,6 +74,7 @@ class Worker(ABC):
                 self.pub_queue.put(result)
             except Exception as e:
                 log.debug(f'Worker received exception: {e}')
+                raise e
                 os.kill(os.getpid(), signal.SIGINT)# }}}
 
     def start(self) -> None:# {{{
