@@ -58,6 +58,7 @@ class Worker(ABC):
     def __init__(self, work_queue: aiop.Queue, pub_queue: aiop.Queue):# {{{
         self.work_queue: aiop.Queue = work_queue
         self.pub_queue: aiop.Queue = pub_queue
+        self._started: asyncio.Event = asyncio.Event()
         log.debug('worker init complete')
         # }}}
 
@@ -66,6 +67,7 @@ class Worker(ABC):
         pass# }}}
 
     def _run(self) -> None:# {{{
+        self._started.set()
         while True:
             log.debug('worker event loop started...')
             try:
@@ -112,12 +114,15 @@ class BaseWSClient(ABC):
         pass# }}}
 
     async def start(self) -> None:# {{{
+        log.debug('starting the publisher and worker')
+        self.publisher.start()
+        self.worker.start()
+        await self.publisher._started.wait()
+        await self.worker._started.wait()
         log.debug('basewsclient .start() method called')
         self.session: aiohttp.ClientSession = aiohttp.ClientSession()
         self.ws: aiohttp.client_ws.ClientWebSocketResponse = await self.session.ws_connect(self.ws_url)
         log.debug('websocket connect established')
-        self.publisher.start()
-        self.worker.start()
         self._started.set()
         await self.on_start()
 
