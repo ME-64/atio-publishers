@@ -14,13 +14,16 @@ import signal
 log: logging.Logger = logging.getLogger('atio')
 
 
+AioQ = queues.AioQueue
+
+
 class Publisher:
 
-    def __init__(self, redis_url: str, redis_channel: str, pub_queue: aiop.queues.Queue):# {{{
+    def __init__(self, redis_url: str, redis_channel: str, pub_queue: AioQ):# {{{
         self._started: asyncio.Event = asyncio.Event()
         self.redis_url: str = redis_url
         self.redis_channel: str = redis_channel
-        self.pub_queue: aiop.queues.Queue = pub_queue
+        self.pub_queue: AioQ = pub_queue
         log.debug('publisher init complete')
         # }}}
 
