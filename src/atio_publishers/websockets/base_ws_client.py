@@ -37,10 +37,10 @@ class Publisher:
         while True:
             try:
                 to_pub: dict = await self.pub_queue.coro_get()
-                await self.redis.publish(self.redis_channel, ujson.dumps(to_pub))
-            except Exception as e:
+                if to_pub:
+                    await self.redis.publish(self.redis_channel, ujson.dumps(to_pub))
+            except:
                 log.debug(f'error received in publisher thread {e}')
-                raise e
                 os.kill(os.getpid(), signal.SIGINT)# }}}
 
     def _run(self) -> None:# {{{
@@ -80,9 +80,7 @@ class Worker(ABC):
                 result: dict = self.do_work(work)
                 log.debug('worker work done')
                 self.pub_queue.put(result)
-            except Exception as e:
-                log.debug(f'Worker received exception: {e}')
-                raise e
+            except:
                 os.kill(os.getpid(), signal.SIGINT)# }}}
 
     def start(self) -> None:# {{{
