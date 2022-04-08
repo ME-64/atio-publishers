@@ -30,7 +30,7 @@ class Publisher:
     async def _start(self) -> None:# {{{
         log.debug('starting publisher...')
         self.redis_pool = aioredis.ConnectionPool.from_url(url=self.redis_url, max_connections=10)
-        self.redis: aioredis.client.Redis = aioredis.from_url(connection_pool=self.redis_pool, decode_responses=True)
+        self.redis: aioredis.client.Redis = aioredis.Redis(connection_pool=self.redis_pool, decode_responses=True)
         await self.redis.ping()
         log.debug('publisher -> redis connection is running')
         self._started.set()
