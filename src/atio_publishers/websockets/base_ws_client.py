@@ -42,7 +42,9 @@ class Publisher:
     def _run(self) -> None:# {{{
         loop: asyncio.AbstractEventLoop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-        loop.create_task(self._start())# }}}
+        loop.create_task(self._start())
+        loop.run_forever()
+        # }}}
 
     def start(self) -> None:# {{{
         log.debug('publisher .start() method called')
