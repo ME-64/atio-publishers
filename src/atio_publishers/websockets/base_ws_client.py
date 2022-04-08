@@ -43,7 +43,7 @@ class Publisher:
 
     def start(self) -> None:# {{{
         log.debug('publisher .start() method called')
-        self.proc: mp.Process = mp.Process(target=self._run)
+        self.proc: mp.Process = mp.Process(target=self._run, daemon=True)
         self.proc.start()
         log.debug('publisher .start() message complete')
         # }}}
@@ -67,12 +67,13 @@ class Worker(ABC):
                 result: dict = self.do_work(work)
                 log.debug('worker work done')
                 self.pub_queue.put(result)
-            except:
+            except Exception as e:
+                log.debug(f'Worker received exception: {e}')
                 os.kill(os.getpid(), signal.SIGINT)# }}}
 
     def start(self) -> None:# {{{
         log.debug('worker .start() method called')
-        self.proc: mp.Process = mp.Process(target=self._run)
+        self.proc: mp.Process = mp.Process(target=self._run, daemon=True)
         self.proc.start()
         log.debug('worker .start() method complete')
         # }}}
