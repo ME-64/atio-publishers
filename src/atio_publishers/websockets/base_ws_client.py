@@ -6,6 +6,7 @@ import asyncio
 import aiohttp
 from redis import asyncio as aioredis
 import aioprocessing as aiop
+from aioprocessing import queues
 import multiprocessing as mp
 import os
 import signal
