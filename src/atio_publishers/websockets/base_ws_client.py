@@ -15,11 +15,11 @@ log: logging.Logger = logging.getLogger('atio')
 
 class Publisher:
 
-    def __init__(self, redis_url: str, redis_channel: str, pub_queue: aiop.Queue):# {{{
+    def __init__(self, redis_url: str, redis_channel: str, pub_queue: aiop.queues.Queue):# {{{
         self._started: asyncio.Event = asyncio.Event()
         self.redis_url: str = redis_url
         self.redis_channel: str = redis_channel
-        self.pub_queue: aiop.Queue = pub_queue
+        self.pub_queue: aiop.queues.Queue = pub_queue
         log.debug('publisher init complete')
         # }}}
 
@@ -55,9 +55,9 @@ class Publisher:
 
 class Worker(ABC):
 
-    def __init__(self, work_queue: aiop.Queue, pub_queue: aiop.Queue):# {{{
-        self.work_queue: aiop.Queue = work_queue
-        self.pub_queue: aiop.Queue = pub_queue
+    def __init__(self, work_queue: aiop.queue.Queue, pub_queue: aiop.queue.Queue):# {{{
+        self.work_queue: aiop.queue.Queue = work_queue
+        self.pub_queue: aiop.queue.Queue = pub_queue
         self._started: asyncio.Event = asyncio.Event()
         log.debug('worker init complete')
         # }}}
@@ -94,8 +94,8 @@ class BaseWSClient(ABC):
             worker: Worker, publisher: Publisher):
         self.ws_url: str = ws_url
         self._started: asyncio.Event = asyncio.Event()
-        self.pub_queue: aiop.Queue = aiop.Queue()
-        self.work_queue: aiop.Queue = aiop.Queue()
+        self.pub_queue: aiop.queue.Queue = aiop.AioQueue()
+        self.work_queue: aiop.queue.Queue = aiop.AioQueue()
         self.publisher: Publisher = publisher(redis_url=redis_url,
                 redis_channel=redis_channel,
                 pub_queue=self.pub_queue)
