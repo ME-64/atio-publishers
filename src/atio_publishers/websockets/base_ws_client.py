@@ -33,8 +33,8 @@ class Publisher:
         await self.redis.ping()
         log.debug('publisher -> redis connection is running')
         self._started.set()
+        log.debug('publisher event loop is running')
         while True:
-            log.debug('publisher event loop is running')
             try:
                 to_pub: dict = await self.pub_queue.coro_get()
                 await self.redis.publish(self.redis_channel, ujson.dumps(to_pub))
@@ -72,8 +72,8 @@ class Worker(ABC):
 
     def _run(self) -> None:# {{{
         self._started.set()
+        log.debug('worker event loop started...')
         while True:
-            log.debug('worker event loop started...')
             try:
                 work  = self.work_queue.get()
                 log.debug('worker received some work...')
