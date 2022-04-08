@@ -39,9 +39,11 @@ class Publisher:
                 to_pub: dict = await self.pub_queue.coro_get()
                 if to_pub:
                     await self.redis.publish(self.redis_channel, ujson.dumps(to_pub))
-            except:
-                log.debug(f'error received in publisher thread {e}')
-                os.kill(os.getpid(), signal.SIGINT)# }}}
+            except Exception as e:
+                log.critical(f'error received in publisher thread {e}')
+                self._started.clear()
+                break
+                # }}}
 
     def _run(self) -> None:# {{{
         loop: asyncio.AbstractEventLoop = asyncio.new_event_loop()
@@ -81,7 +83,9 @@ class Worker(ABC):
                 log.debug('worker work done')
                 self.pub_queue.put(result)
             except:
-                os.kill(os.getpid(), signal.SIGINT)# }}}
+                self._started.clear()
+                break
+                # }}}
 
     def start(self) -> None:# {{{
         log.debug('worker .start() method called')
@@ -130,12 +134,16 @@ class BaseWSClient(ABC):
         await self.on_start()
 
         log.debug('websocket event loop starting')
-        while not self.ws.closed:
-            msg: aiohttp.WSMessage = await self.ws.receive()
+        while not self.ws.closed and self.publisher._started.is_set() and self.worker._started.is_set():
+            try:
+                msg: aiohttp.WSMessage = await asyncio.wait_for(self.ws.receive(), timeout=5)
+            except Exception as e:
+                log.critical('timeout on websocket connection, shutting down')
+                sys.exit(1)
             if msg.type == aiohttp.WSMsgType.TEXT:
                 await self.on_message(msg)
             else:
                 log.debug(f'msg received: {msg}')
         # when the websocket connection is closed, we disconnect
         # and let the container handle reconnecting
-        os.kill(os.getpid(), signal.SIGINT)# }}}
+        sys.exit(1) # }}}
