@@ -20,7 +20,7 @@ AioQ = queues.AioQueue
 class Publisher:
 
     def __init__(self, redis_url: str, redis_channel: str, pub_queue: AioQ):# {{{
-        self._started: aiop.Event = aiop.Event()
+        self._started: aiop.AioEvent = aiop.AioEvent()
         self.redis_url: str = redis_url
         self.redis_channel: str = redis_channel
         self.pub_queue: AioQ = pub_queue
@@ -62,7 +62,7 @@ class Worker(ABC):
     def __init__(self, work_queue: AioQ, pub_queue: AioQ):# {{{
         self.work_queue: AioQ = work_queue
         self.pub_queue: AioQ = pub_queue
-        self._started: aiop.Event = aiop.Event()
+        self._started: aiop.AioEvent = aiop.AioEvent()
         log.debug('worker init complete')
         # }}}
 
@@ -97,7 +97,7 @@ class BaseWSClient(ABC):
     def __init__(self, ws_url: str, redis_url: str, redis_channel: str,#{{{
             worker: Worker, publisher: Publisher):
         self.ws_url: str = ws_url
-        self._started: aiop.Event = aiop.Event()
+        self._started: aiop.AioEvent = aiop.AioEvent()
         self.pub_queue: AioQ = aiop.AioQueue()
         self.work_queue: AioQ = aiop.AioQueue()
         self.publisher: Publisher = publisher(redis_url=redis_url,
@@ -121,8 +121,9 @@ class BaseWSClient(ABC):
         log.debug('starting the publisher and worker')
         self.publisher.start()
         self.worker.start()
-        self.publisher._started.wait()
-        self.worker._started.wait()
+        await self.publisher._started.coro_wait()
+        await self.worker._started.coro_wait()
+        log.debug('publisher and worker started')
         log.debug('basewsclient .start() method called')
         self.session: aiohttp.ClientSession = aiohttp.ClientSession()
         self.ws: aiohttp.client_ws.ClientWebSocketResponse = await self.session.ws_connect(self.ws_url)
