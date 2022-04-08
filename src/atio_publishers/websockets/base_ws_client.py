@@ -19,7 +19,9 @@ class Publisher:
         self._started: asyncio.Event = asyncio.Event()
         self.redis_url: str = redis_url
         self.redis_channel: str = redis_channel
-        self.pub_queue: aiop.Queue = pub_queue# }}}
+        self.pub_queue: aiop.Queue = pub_queue
+        log.debug('publisher init complete')
+        # }}}
 
     async def _start(self) -> None:# {{{
         log.debug('starting publisher...')
@@ -52,7 +54,9 @@ class Worker(ABC):
 
     def __init__(self, work_queue: aiop.Queue, pub_queue: aiop.Queue):# {{{
         self.work_queue: aiop.Queue = work_queue
-        self.pub_queue: aiop.Queue = pub_queue# }}}
+        self.pub_queue: aiop.Queue = pub_queue
+        log.debug('worker init complete')
+        # }}}
 
     @abstractmethod
     def do_work(self, work: dict) -> dict:# {{{
