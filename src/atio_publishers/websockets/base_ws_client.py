@@ -36,7 +36,7 @@ class Publisher:
         while True:
             try:
                 to_pub: dict = await self.pub_queue.coro_get()
-                if to_pub:
+                if to_pub[1]:
                     await asyncio.wait_for(self.redis.publish(to_pub[0], ujson.dumps(to_pub[1])), timeout=5)
             except TimeoutError as e:
                 log.critical(f'error received in publisher thread {e}')
