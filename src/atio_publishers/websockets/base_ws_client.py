@@ -36,9 +36,8 @@ class Publisher:
         while True:
             try:
                 to_pub: dict = await self.pub_queue.coro_get()
-                if to_pub[1]:
-                    await asyncio.wait_for(self.redis.publish(to_pub[0], ujson.dumps(to_pub[1])), timeout=5)
-            except TimeoutError as e:
+                await asyncio.wait_for(self.redis.publish(to_pub[0], ujson.dumps(to_pub[1])), timeout=5)
+            except Exception as e:
                 log.critical(f'error received in publisher thread {e}')
                 self._started.clear()# type: ignore
                 break
@@ -47,8 +46,7 @@ class Publisher:
     def _run(self) -> None:# {{{
         loop: asyncio.AbstractEventLoop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-        loop.create_task(self._start())
-        loop.run_forever()
+        loop.run_until_complete(self._start())
         # }}}
 
     def start(self) -> None:# {{{
@@ -68,7 +66,7 @@ class Worker(ABC):
         # }}}
 
     @abstractmethod
-    def do_work(self, work: dict) -> tuple[str, dict]:# {{{
+    def do_work(self, work: dict) -> tuple[str, dict] | None:# {{{
         pass# }}}
 
     def _run(self) -> None:# {{{
@@ -78,10 +76,12 @@ class Worker(ABC):
             try:
                 work  = self.work_queue.get()
                 log.debug('worker received some work...')
-                result: dict = self.do_work(work)
+                result: tuple[str, dict] | None = self.do_work(work)
                 log.debug('worker work done')
-                self.pub_queue.put(result)
-            except:
+                if result:
+                    self.pub_queue.put(result)
+            except Exception as e:
+                log.critical(f'exception received while trying todo work {e}')
                 self._started.clear() # type: ignore
                 break
                 # }}}
