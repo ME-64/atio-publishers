@@ -4,5 +4,6 @@ sortedcontainers>=2.4,<3
 ujson>=4.3,<5
 aioprocessing>=2,<3
 redis>4.2,<5
+typing_extensions>=4,<5
 
 
