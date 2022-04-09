@@ -149,17 +149,16 @@ class BaseWSClient(ABC):
         self._started.clear()  # type: ignore
         # }}}
 
-    def start(self) -> None:
+    def start(self) -> None:# {{{
         loop: asyncio.AbstractEventLoop = asyncio.new_event_loop()
-        loop.run_until_complete(self._start())
+        loop.run_until_complete(self._start())# }}}
 
 
 class WSDict(TypedDict):
-    client: Type[BaseWSClient]
+    client: Type[BaseWSClient]# {{{
     failed: bool
     numb_retries: int
-    process: mp.Process
-
+    process: mp.Process# }}}
 
 
 class WSManager:
