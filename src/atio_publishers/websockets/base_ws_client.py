@@ -4,7 +4,7 @@ import logging
 import sys
 import asyncio
 import aiohttp
-from redis import asyncio as aioredis
+from redis import asyncio as aioredis # type: ignore
 import aioprocessing as aiop
 import multiprocessing as mp
 from typing import Type
@@ -16,11 +16,11 @@ log: logging.Logger = logging.getLogger('atio')
 
 class Publisher:
 
-    def __init__(self, redis_url: str, redis_channel: str, pub_queue: aiop.queues.AioQueue):# {{{
-        self._started: aiop.locks.AioEvent = aiop.AioEvent()
+    def __init__(self, redis_url: str, redis_channel: str, pub_queue):# {{{
+        self._started = aiop.AioEvent()
         self.redis_url: str = redis_url
         self.redis_channel: str = redis_channel
-        self.pub_queue: aiop.queues.AioQueue = pub_queue
+        self.pub_queue = pub_queue
         log.debug('publisher init complete')
         # }}}
 
@@ -30,7 +30,7 @@ class Publisher:
         self.redis: aioredis.client.Redis = aioredis.Redis(connection_pool=self.redis_pool, decode_responses=True)
         await self.redis.ping()
         log.debug('publisher -> redis connection is running')
-        self._started.set()
+        self._started.set() # type: ignore
         log.debug('publisher event loop is running')
         while True:
             try:
@@ -39,7 +39,7 @@ class Publisher:
                     await self.redis.publish(self.redis_channel, ujson.dumps(to_pub))
             except Exception as e:
                 log.critical(f'error received in publisher thread {e}')
-                self._started.clear()
+                self._started.clear()# type: ignore
                 break
                 # }}}
 
@@ -59,10 +59,10 @@ class Publisher:
 
 class Worker(ABC):
 
-    def __init__(self, work_queue: aiop.queues.AioQueue, pub_queue: AioQ):# {{{
-        self.work_queue: aiop.queues.AioQueue = work_queue
-        self.pub_queue: aiop.queues.AioQueue = pub_queue
-        self._started: aiop.locks.AioEvent = aiop.AioEvent()
+    def __init__(self, work_queue, pub_queue):# {{{
+        self.work_queue = work_queue
+        self.pub_queue = pub_queue
+        self._started = aiop.AioEvent()
         log.debug('worker init complete')
         # }}}
 
@@ -71,7 +71,7 @@ class Worker(ABC):
         pass# }}}
 
     def _run(self) -> None:# {{{
-        self._started.set()
+        self._started.set() # type: ignore
         log.debug('worker event loop started...')
         while True:
             try:
@@ -97,9 +97,9 @@ class BaseWSClient(ABC):
     def __init__(self, ws_url: str, redis_url: str, redis_channel: str,#{{{
             worker: Type[Worker], publisher: Type[Publisher]):
         self.ws_url: str = ws_url
-        self._started: aiop.locks.AioEvent = aiop.AioEvent()
-        self.pub_queue: aiop.queues.AioQueue = aiop.AioQueue()
-        self.work_queue: aiop.queues.AioQueue = aiop.AioQueue()
+        self._started = aiop.AioEvent()
+        self.pub_queue = aiop.AioQueue()
+        self.work_queue = aiop.AioQueue()
         self.publisher: Publisher = publisher(redis_url=redis_url,
                 redis_channel=redis_channel,
                 pub_queue=self.pub_queue)
@@ -121,18 +121,18 @@ class BaseWSClient(ABC):
         log.debug('starting the publisher and worker')
         self.publisher.start()
         self.worker.start()
-        await self.publisher._started.coro_wait()
-        await self.worker._started.coro_wait()
+        await self.publisher._started.coro_wait() # type: ignore
+        await self.worker._started.coro_wait() # type: ignore
         log.debug('publisher and worker started')
         log.debug('basewsclient .start() method called')
         self.session: aiohttp.ClientSession = aiohttp.ClientSession()
         self.ws: aiohttp.ClientWebSocketResponse = await self.session.ws_connect(self.ws_url)
         log.debug('websocket connect established')
-        self._started.set()
+        self._started.set() # type: ignore
         await self.on_start()
 
         log.debug('websocket event loop starting')
-        while not self.ws.closed and self.publisher._started.is_set() and self.worker._started.is_set():
+        while not self.ws.closed and self.publisher._started.is_set() and self.worker._started.is_set(): # type: ignore
             try:
                 msg: aiohttp.WSMessage = await asyncio.wait_for(self.ws.receive(), timeout=5)
             except:
