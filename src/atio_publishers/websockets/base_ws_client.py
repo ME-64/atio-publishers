@@ -6,24 +6,21 @@ import asyncio
 import aiohttp
 from redis import asyncio as aioredis
 import aioprocessing as aiop
-from aioprocessing import queues
 import multiprocessing as mp
-import os
-import signal
+from typing import Type
 
 log: logging.Logger = logging.getLogger('atio')
 
 
-AioQ = queues.AioQueue
 
 
 class Publisher:
 
-    def __init__(self, redis_url: str, redis_channel: str, pub_queue: AioQ):# {{{
-        self._started: aiop.AioEvent = aiop.AioEvent()
+    def __init__(self, redis_url: str, redis_channel: str, pub_queue: aiop.queues.AioQueue):# {{{
+        self._started: aiop.locks.AioEvent = aiop.AioEvent()
         self.redis_url: str = redis_url
         self.redis_channel: str = redis_channel
-        self.pub_queue: AioQ = pub_queue
+        self.pub_queue: aiop.queues.AioQueue = pub_queue
         log.debug('publisher init complete')
         # }}}
 
@@ -62,10 +59,10 @@ class Publisher:
 
 class Worker(ABC):
 
-    def __init__(self, work_queue: AioQ, pub_queue: AioQ):# {{{
-        self.work_queue: AioQ = work_queue
-        self.pub_queue: AioQ = pub_queue
-        self._started: aiop.AioEvent = aiop.AioEvent()
+    def __init__(self, work_queue: aiop.queues.AioQueue, pub_queue: AioQ):# {{{
+        self.work_queue: aiop.queues.AioQueue = work_queue
+        self.pub_queue: aiop.queues.AioQueue = pub_queue
+        self._started: aiop.locks.AioEvent = aiop.AioEvent()
         log.debug('worker init complete')
         # }}}
 
@@ -98,11 +95,11 @@ class Worker(ABC):
 class BaseWSClient(ABC):
 
     def __init__(self, ws_url: str, redis_url: str, redis_channel: str,#{{{
-            worker: Worker, publisher: Publisher):
+            worker: Type[Worker], publisher: Type[Publisher]):
         self.ws_url: str = ws_url
-        self._started: aiop.AioEvent = aiop.AioEvent()
-        self.pub_queue: AioQ = aiop.AioQueue()
-        self.work_queue: AioQ = aiop.AioQueue()
+        self._started: aiop.locks.AioEvent = aiop.AioEvent()
+        self.pub_queue: aiop.queues.AioQueue = aiop.AioQueue()
+        self.work_queue: aiop.queues.AioQueue = aiop.AioQueue()
         self.publisher: Publisher = publisher(redis_url=redis_url,
                 redis_channel=redis_channel,
                 pub_queue=self.pub_queue)
@@ -129,7 +126,7 @@ class BaseWSClient(ABC):
         log.debug('publisher and worker started')
         log.debug('basewsclient .start() method called')
         self.session: aiohttp.ClientSession = aiohttp.ClientSession()
-        self.ws: aiohttp.client_ws.ClientWebSocketResponse = await self.session.ws_connect(self.ws_url)
+        self.ws: aiohttp.ClientWebSocketResponse = await self.session.ws_connect(self.ws_url)
         log.debug('websocket connect established')
         self._started.set()
         await self.on_start()
@@ -138,7 +135,7 @@ class BaseWSClient(ABC):
         while not self.ws.closed and self.publisher._started.is_set() and self.worker._started.is_set():
             try:
                 msg: aiohttp.WSMessage = await asyncio.wait_for(self.ws.receive(), timeout=5)
-            except Exception as e:
+            except:
                 log.critical('timeout on websocket connection, shutting down')
                 sys.exit(1)
             if msg.type == aiohttp.WSMsgType.TEXT:

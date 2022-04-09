@@ -2,6 +2,7 @@ from setuptools import setup
 from setuptools import find_packages
 from glob import glob
 import pathlib
+import os
 
 # python3 setup.py sdist bdist_wheel
 # twine upload dist/*
@@ -16,7 +17,7 @@ setup(
         name = 'atio-publishers',
         packages = find_packages('src'),
         package_dir = {'': 'src'},
-        py_modules=[splitext(basename(path))[0] for path in glob('src/*.py')],
+        py_modules=[os.path.splitext(os.path.basename(path))[0] for path in glob('src/*.py')],
         version = __version__,
         license='MIT',
         description = 'Utility classes that aid streaming data to the atio trading engine',
