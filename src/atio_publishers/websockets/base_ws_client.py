@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 import ujson
+import time
 import logging
 import sys
 import asyncio
@@ -8,6 +9,7 @@ from redis import asyncio as aioredis # type: ignore
 import aioprocessing as aiop
 import multiprocessing as mp
 from typing import Type
+from typing_extensions import TypedDict
 
 log: logging.Logger = logging.getLogger('atio')
 
@@ -36,8 +38,8 @@ class Publisher:
             try:
                 to_pub: dict = await self.pub_queue.coro_get()
                 if to_pub:
-                    await self.redis.publish(self.redis_channel, ujson.dumps(to_pub))
-            except Exception as e:
+                    await asyncio.wait_for(self.redis.publish(self.redis_channel, ujson.dumps(to_pub)), timeout=5)
+            except TimeoutError as e:
                 log.critical(f'error received in publisher thread {e}')
                 self._started.clear()# type: ignore
                 break
@@ -81,7 +83,7 @@ class Worker(ABC):
                 log.debug('worker work done')
                 self.pub_queue.put(result)
             except:
-                self._started.clear()
+                self._started.clear() # type: ignore
                 break
                 # }}}
 
@@ -117,7 +119,7 @@ class BaseWSClient(ABC):
     async def on_message(self, msg: aiohttp.WSMessage) -> None:# {{{
         pass# }}}
 
-    async def start(self) -> None:# {{{
+    async def _start(self) -> None:# {{{
         log.debug('starting the publisher and worker')
         self.publisher.start()
         self.worker.start()
@@ -144,4 +146,75 @@ class BaseWSClient(ABC):
                 log.debug(f'msg received: {msg}')
         # when the websocket connection is closed, we disconnect
         # and let the container handle reconnecting
-        sys.exit(1) # }}}
+        self._started.clear()  # type: ignore
+        # }}}
+
+    def start(self) -> None:
+        loop: asyncio.AbstractEventLoop = asyncio.new_event_loop()
+        loop.run_until_complete(self._start())
+
+
+class WSDict(TypedDict):
+    client: Type[BaseWSClient]
+    failed: bool
+    numb_retries: int
+    process: mp.Process
+
+
+
+class WSManager:
+
+    def __init__(self, ws_clients: list[Type[BaseWSClient]], max_retries: int = 5):# {{{
+        """intialise each websocket client and their retries"""
+        self.max_retries: int = max_retries
+        self.ws_clients: dict[int, WSDict]  = {}
+        self.complete_failure: bool = False
+
+        for i, wsc in enumerate(ws_clients):
+            self.ws_clients[i] = {
+                    'client': wsc,
+                    'failed': False,
+                    'numb_retries': 0,
+                    'process': mp.Process(target=wsc.start, daemon=True)
+                    }# }}}
+
+    def intialise_clients(self):# {{{
+        for cid, client in self.ws_clients.items():
+            log.debug(f'starting client with {cid}')
+            client['process'].start()
+            client['client']._started.wait() # type: ignore }}}
+
+    def kill_clients(self):# {{{
+        for client in self.ws_clients.values():
+            client['process'].terminate()# }}}
+
+    def check_fail(self):# {{{
+        for client in self.ws_clients.values():
+            if client['client']._started.is_set() == False: # type: ignore
+                client['failed'] = True# }}}
+
+    def restart_failed(self):# {{{
+        for client in self.ws_clients.values():
+            if client['failed'] == False:
+                continue
+
+            if client['numb_retries'] >= self.max_retries:
+                log.critical(f'a client has failed and gone over maximum restarts, exiting')
+                self.kill_clients()
+                self.complete_failure = True
+            else:
+                client['process'].terminate()
+                time.sleep(client['numb_retries'] * 3)
+                log.debug('sleeping before retrying client')
+                client['numb_retries'] += 1
+                client['process'] = mp.Process(target=client['client'].start, daemon=True)
+                client['process'].start()# }}}
+
+    def run(self):# {{{
+        self.intialise_clients()
+        while not self.complete_failure:
+            self.check_fail()
+            self.restart_failed()# }}}
+
+
+
