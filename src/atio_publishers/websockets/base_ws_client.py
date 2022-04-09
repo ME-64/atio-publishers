@@ -18,10 +18,9 @@ log: logging.Logger = logging.getLogger('atio')
 
 class Publisher:
 
-    def __init__(self, redis_url: str, redis_channel: str, pub_queue):# {{{
+    def __init__(self, redis_url: str, pub_queue):# {{{
         self._started = aiop.AioEvent()
         self.redis_url: str = redis_url
-        self.redis_channel: str = redis_channel
         self.pub_queue = pub_queue
         log.debug('publisher init complete')
         # }}}
@@ -38,7 +37,7 @@ class Publisher:
             try:
                 to_pub: dict = await self.pub_queue.coro_get()
                 if to_pub:
-                    await asyncio.wait_for(self.redis.publish(self.redis_channel, ujson.dumps(to_pub)), timeout=5)
+                    await asyncio.wait_for(self.redis.publish(to_pub[0], ujson.dumps(to_pub[1])), timeout=5)
             except TimeoutError as e:
                 log.critical(f'error received in publisher thread {e}')
                 self._started.clear()# type: ignore
@@ -69,7 +68,7 @@ class Worker(ABC):
         # }}}
 
     @abstractmethod
-    def do_work(self, work: dict) -> dict:# {{{
+    def do_work(self, work: dict) -> tuple[str, dict]:# {{{
         pass# }}}
 
     def _run(self) -> None:# {{{
@@ -96,15 +95,13 @@ class Worker(ABC):
 
 class BaseWSClient(ABC):
 
-    def __init__(self, ws_url: str, redis_url: str, redis_channel: str,#{{{
+    def __init__(self, ws_url: str, redis_url: str,#{{{
             worker: Type[Worker], publisher: Type[Publisher]):
         self.ws_url: str = ws_url
         self._started = aiop.AioEvent()
         self.pub_queue = aiop.AioQueue()
         self.work_queue = aiop.AioQueue()
-        self.publisher: Publisher = publisher(redis_url=redis_url,
-                redis_channel=redis_channel,
-                pub_queue=self.pub_queue)
+        self.publisher: Publisher = publisher(redis_url=redis_url, pub_queue=self.pub_queue)
         self.worker: Worker = worker(self.work_queue, self.pub_queue)# }}}
 
     @abstractmethod
