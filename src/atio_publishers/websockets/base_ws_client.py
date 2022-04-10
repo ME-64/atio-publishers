@@ -8,8 +8,7 @@ import aiohttp
 from redis import asyncio as aioredis # type: ignore
 import aioprocessing as aiop
 import multiprocessing as mp
-from typing import Type
-from typing_extensions import TypedDict
+from typing import Type, TypedDict
 
 log: logging.Logger = logging.getLogger('atio')
 
