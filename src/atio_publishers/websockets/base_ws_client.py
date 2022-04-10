@@ -170,7 +170,8 @@ class WSManager:
                     'client': wsc,
                     'failed': False,
                     'numb_retries': 0,
-                    'process': mp.Process(target=wsc.start, daemon=True)
+                    # process cant be a daemon b/c spawns more processes
+                    'process': mp.Process(target=wsc.start, daemon=False) 
                     }# }}}
 
     def intialise_clients(self):# {{{
