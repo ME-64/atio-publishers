@@ -130,7 +130,7 @@ class BaseWSClient(ABC):
         await self.on_start()
 
         log.debug('websocket event loop starting')
-        while not self.ws.closed and self.publisher._started.is_set() and self.worker._started.is_set(): # type: ignore
+        while not self.ws.closed and self.publisher._started.is_set() and self.worker._started.is_set() and self._started.is_set(): # type: ignore
             try:
                 msg: aiohttp.WSMessage = await asyncio.wait_for(self.ws.receive(), timeout=5)
                 if msg.type == aiohttp.WSMsgType.TEXT:
