@@ -8,14 +8,14 @@ import aiohttp
 from redis import asyncio as aioredis # type: ignore
 import aioprocessing as aiop
 import multiprocessing as mp
-from typing import Type, TypedDict
+from typing import Type, TypedDict, Any
 
 log: logging.Logger = logging.getLogger('atio')
 
 
 
 
-class Publisher:
+class Publisher(ABC):
 
     def __init__(self, redis_url: str, pub_queue):# {{{
         self._started = aiop.AioEvent()
@@ -34,12 +34,17 @@ class Publisher:
         log.debug('publisher event loop is running')
         while True:
             try:
-                to_pub: dict = await self.pub_queue.coro_get()
-                await asyncio.wait_for(self.redis.publish(to_pub[0], ujson.dumps(to_pub[1])), timeout=5)
+                to_pub: Any = await self.pub_queue.coro_get()
+                await asyncio.wait_for(self.publish(to_pub), timeout=5)
             except Exception as e:
                 log.critical(f'error received in publisher thread {e}')
                 self._started.clear()# type: ignore
                 break
+
+
+    @abstractmethod
+    async def publish(self, *args, **kwargs) -> None:# {{{
+        pass# }}}
                 # }}}
 
     def _run(self) -> None:# {{{
@@ -75,7 +80,7 @@ class Worker(ABC):
             try:
                 work  = self.work_queue.get()
                 log.debug('worker received some work...')
-                result: tuple[str, dict] | None = self.do_work(work)
+                result: Any = self.do_work(work)
                 log.debug('worker work done')
                 if result:
                     self.pub_queue.put(result)
@@ -198,11 +203,13 @@ class WSManager:
                 self.complete_failure = True
             else:
                 client['process'].terminate()
-                time.sleep(client['numb_retries'] * 3)
                 log.debug('sleeping before retrying client')
+                time.sleep(client['numb_retries'] * 3)
                 client['numb_retries'] += 1
                 client['process'] = mp.Process(target=client['client'].start, daemon=True)
-                client['process'].start()# }}}
+                client['process'].start()
+                client['failed'] = False
+                # }}}
 
     def run(self):# {{{
         self.intialise_clients()
