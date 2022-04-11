@@ -71,7 +71,7 @@ class Worker(ABC):
     def _run(self) -> None:# {{{
         self._started.set() # type: ignore
         log.debug('worker event loop started...')
-        while True:
+        while self._started.is_set(): # type: ignore
             try:
                 work  = self.work_queue.get()
                 log.debug('worker received some work...')
@@ -133,13 +133,11 @@ class BaseWSClient(ABC):
         while not self.ws.closed and self.publisher._started.is_set() and self.worker._started.is_set(): # type: ignore
             try:
                 msg: aiohttp.WSMessage = await asyncio.wait_for(self.ws.receive(), timeout=5)
+                if msg.type == aiohttp.WSMsgType.TEXT:
+                    await self.on_message(msg)
             except:
                 log.critical('timeout on websocket connection, shutting down')
-                sys.exit(1)
-            if msg.type == aiohttp.WSMsgType.TEXT:
-                await self.on_message(msg)
-            else:
-                log.debug(f'msg received: {msg}')
+                self._started.clear() # type: ignore
         # when the websocket connection is closed, we disconnect
         # and let the container handle reconnecting
         self._started.clear()  # type: ignore
