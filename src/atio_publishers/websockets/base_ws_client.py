@@ -1,8 +1,6 @@
 from abc import ABC, abstractmethod
-import ujson
 import time
 import logging
-import sys
 import asyncio
 import aiohttp
 from redis import asyncio as aioredis # type: ignore
@@ -40,12 +38,12 @@ class Publisher(ABC):
                 log.critical(f'error received in publisher thread {e}')
                 self._started.clear()# type: ignore
                 break
+                # }}}
 
 
     @abstractmethod
     async def publish(self, *args, **kwargs) -> None:# {{{
         pass# }}}
-                # }}}
 
     def _run(self) -> None:# {{{
         loop: asyncio.AbstractEventLoop = asyncio.new_event_loop()
