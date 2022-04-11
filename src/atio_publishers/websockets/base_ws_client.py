@@ -19,17 +19,17 @@ class Publisher(ABC):
         self._started = aiop.AioEvent()
         self.redis_url: str = redis_url
         self.pub_queue = pub_queue
-        log.debug('publisher init complete')
+        log.info('publisher init complete')
         # }}}
 
     async def _start(self) -> None:# {{{
-        log.debug('starting publisher...')
+        log.info('starting publisher...')
         self.redis_pool = aioredis.ConnectionPool.from_url(url=self.redis_url, max_connections=10)
         self.redis: aioredis.client.Redis = aioredis.Redis(connection_pool=self.redis_pool, decode_responses=True)
         await self.redis.ping()
-        log.debug('publisher -> redis connection is running')
+        log.info('publisher -> redis connection is running')
         self._started.set() # type: ignore
-        log.debug('publisher event loop is running')
+        log.info('publisher event loop is running')
         while True:
             try:
                 to_pub: Any = await self.pub_queue.coro_get()
@@ -52,10 +52,10 @@ class Publisher(ABC):
         # }}}
 
     def start(self) -> None:# {{{
-        log.debug('publisher .start() method called')
+        log.info('publisher .start() method called')
         self.proc: mp.Process = mp.Process(target=self._run, daemon=True)
         self.proc.start()
-        log.debug('publisher .start() message complete')
+        log.info('publisher .start() message complete')
         # }}}
 
 class Worker(ABC):
@@ -64,7 +64,7 @@ class Worker(ABC):
         self.work_queue = work_queue
         self.pub_queue = pub_queue
         self._started = aiop.AioEvent()
-        log.debug('worker init complete')
+        log.info('worker init complete')
         # }}}
 
     @abstractmethod
@@ -73,7 +73,7 @@ class Worker(ABC):
 
     def _run(self) -> None:# {{{
         self._started.set() # type: ignore
-        log.debug('worker event loop started...')
+        log.info('worker event loop started...')
         while self._started.is_set(): # type: ignore
             try:
                 work  = self.work_queue.get()
@@ -89,10 +89,10 @@ class Worker(ABC):
                 # }}}
 
     def start(self) -> None:# {{{
-        log.debug('worker .start() method called')
+        log.info('worker .start() method called')
         self.proc: mp.Process = mp.Process(target=self._run, daemon=True)
         self.proc.start()
-        log.debug('worker .start() method complete')
+        log.info('worker .start() method complete')
         # }}}
 
 class BaseWSClient(ABC):
@@ -119,20 +119,20 @@ class BaseWSClient(ABC):
         pass# }}}
 
     async def _start(self) -> None:# {{{
-        log.debug('starting the publisher and worker')
+        log.info('starting the publisher and worker')
         self.publisher.start()
         self.worker.start()
         await self.publisher._started.coro_wait() # type: ignore
         await self.worker._started.coro_wait() # type: ignore
-        log.debug('publisher and worker started')
-        log.debug('basewsclient .start() method called')
+        log.info('publisher and worker started')
+        log.info('basewsclient .start() method called')
         self.session: aiohttp.ClientSession = aiohttp.ClientSession()
         self.ws: aiohttp.ClientWebSocketResponse = await self.session.ws_connect(self.ws_url)
-        log.debug('websocket connect established')
+        log.info('websocket connect established')
         self._started.set() # type: ignore
         await self.on_start()
 
-        log.debug('websocket event loop starting')
+        log.info('websocket event loop starting')
         while not self.ws.closed and self.publisher._started.is_set() and self.worker._started.is_set() and self._started.is_set(): # type: ignore
             try:
                 msg: aiohttp.WSMessage = await asyncio.wait_for(self.ws.receive(), timeout=5)
@@ -177,7 +177,7 @@ class WSManager:
 
     def intialise_clients(self):# {{{
         for cid, client in self.ws_clients.items():
-            log.debug(f'starting client with {cid}')
+            log.info(f'starting client with {cid}')
             client['process'].start()
             client['client']._started.wait() # type: ignore }}}
 
@@ -188,6 +188,7 @@ class WSManager:
     def check_fail(self):# {{{
         for client in self.ws_clients.values():
             if client['client']._started.is_set() == False: # type: ignore
+                log.critical('a client has failed')
                 client['failed'] = True# }}}
 
     def restart_failed(self):# {{{
@@ -201,7 +202,7 @@ class WSManager:
                 self.complete_failure = True
             else:
                 client['process'].terminate()
-                log.debug('sleeping before retrying client')
+                log.info('sleeping before retrying client')
                 time.sleep(client['numb_retries'] * 3)
                 client['numb_retries'] += 1
                 client['process'] = mp.Process(target=client['client'].start, daemon=True)
